@@ -44,6 +44,7 @@ if __name__ == "__main__":
     summary_writer = SummaryWriter()
 
     loss_list = list()
+    acc_list = list()
 
     epoch = 10
 
@@ -58,20 +59,28 @@ if __name__ == "__main__":
             loss.backward()
             optimizer.step()
             loss_list.append(loss.item())
+            acc = torch.mean((torch.argmax(pred.cpu(), dim=-1) == speaker).float())
+            acc_list.append(acc)
             # print(loss.item())
 
             if step % logging_step == 0:
                 summary_writer.add_scalar('train/loss', np.mean(loss_list), step)
+                summary_writer.add_scalar('train/acc', np.mean(acc_list), step)
                 loss_list = list()
+                acc_list = list()
 
             step += 1
             
         model.eval()
         loss_list = list()
+        acc_list = list()
         for image, speaker in tqdm(test_loader):
             pred = model(image.to(device))
             loss = loss_function(pred, speaker.to(device))
             loss_list.append(loss.item())
+            acc = torch.mean((torch.argmax(pred.cpu(), dim=-1) == speaker).float())
+            acc_list.append(acc)
         
         summary_writer.add_scalar('eval/loss', np.mean(loss_list), step)
+        summary_writer.add_scalar('eval/acc', np.mean(acc_list), step)
         
