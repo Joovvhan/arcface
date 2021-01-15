@@ -80,8 +80,8 @@ def get_renumbering_identities_dict(identity_counter):
     old_keys = sorted(identity_counter.keys())
     old2new = {key: i for i, key in enumerate(old_keys)}
 
-    print(f'Original Speaker Num {max(old_keys)} ' + \
-          f'=> Reduced Speaker Num {len(old2new.keys())}')
+    print(f'Original Identity Num {max(old_keys)} ' + \
+          f'=> Reduced Identity Num {len(old2new.keys())}')
 
     return old2new
 
