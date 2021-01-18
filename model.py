@@ -3,6 +3,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+HYPER_RADIUS = 64.0
+
+ANGULAR_MARGIN = 0.2
+
 def label2mask(label, h):
     B = len(label)
     H = h
@@ -15,8 +19,12 @@ def label2mask(label, h):
 
 class ArcFace(nn.Module):
     
-    def __init__(self, num_class):
+    def __init__(self, num_class, device='cpu'):
         super(ArcFace, self).__init__()
+
+        self.num_class = num_class
+
+        self.device = device
 
         m = resnet101(pretrained=True)
         resnet101encoder = Resnet101Encoder(m.conv1, 
@@ -39,11 +47,19 @@ class ArcFace(nn.Module):
 
         # self.fc_2 = nn.Linear(512, 128)
         # self.bn_4 = nn.BatchNorm1d(128)
-        
+        # self.identity_embedding = nn.Linear(512, num_class, bias=False)
         self.identity_embedding = nn.utils.weight_norm(nn.Linear(512, num_class, bias=False), dim=0)
         # self.identity_embedding = nn.utils.weight_norm(nn.Linear(128, num_class, bias=False), dim=0)
     
-    def forward(self, input_tensor):
+        self.scale = nn.parameter.Parameter(torch.tensor(HYPER_RADIUS), requires_grad=False)
+        
+        self.m = nn.parameter.Parameter(torch.tensor(ANGULAR_MARGIN), requires_grad=False)
+        '''
+        We follow [37] to set the feature scale s to 64 and choose
+        the angular margin m of ArcFace at 0.5.
+        '''
+
+    def forward(self, input_tensor, ground_truth_tensor):
                 
         tensor = self.encoder(input_tensor)
             
@@ -56,23 +72,24 @@ class ArcFace(nn.Module):
         # tensor = self.fc_2(tensor)
         # tensor = self.bn_4(tensor)
         
-        # tensor = self.speaker_embedding(tensor)
+        # tensor = self.identity_embedding(tensor)
 
         tensor_g = torch.norm(tensor, dim=1, keepdim=True)
         normalized_tensor = tensor / tensor_g
-
         tensor = self.identity_embedding(normalized_tensor)
         layer_g = self.identity_embedding.weight_g
-        tensor = tensor / layer_g.squeeze(1)
+        tensor = tensor / layer_g.squeeze(1) # 0 < tensor < 1
 
         # Additive Margin
-        # mask = label2mask(ground_truth_tensor, self.num_speakers).to(self.device)
+        mask = label2mask(ground_truth_tensor, self.num_class).to(self.device)
 
-        # masked_embedding = tensor * mask
-        # modified_angle = torch.acos(masked_embedding) + self.m * mask
-        # modified_angle = torch.clamp(modified_angle, 0, torch.acos(torch.tensor(-1.0)))
-        # modified_cos = torch.cos(modified_angle)
-        # tensor = tensor + modified_cos - masked_embedding
+        masked_embedding = tensor * mask
+        modified_angle = torch.acos(masked_embedding) + self.m * mask
+        modified_angle = torch.clamp(modified_angle, 0, torch.acos(torch.tensor(-1.0)))
+        modified_cos = torch.cos(modified_angle)
+        tensor = tensor + modified_cos - masked_embedding
+
+        tensor = self.scale * tensor
 
         tensor = F.log_softmax(tensor, dim=-1)
         

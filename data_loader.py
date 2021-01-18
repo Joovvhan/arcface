@@ -55,7 +55,7 @@ def collate_fn(dataset, pretrained=True):
     return (torch.tensor(image_list, dtype=torch.float), 
             torch.tensor(id_list, dtype=torch.long))
 
-def build_data_loader(dataset, batch_size=24, shuffle=True):
+def build_data_loader(dataset, batch_size=64, shuffle=True):
     data_loader = DataLoader(dataset,
                              batch_size=batch_size, 
                              shuffle=shuffle,

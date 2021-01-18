@@ -67,11 +67,12 @@ if __name__ == "__main__":
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    model = ArcFace(reduced_number_speakers).to(device)
+    model = ArcFace(reduced_number_speakers, device).to(device)
 
     loss_function = nn.NLLLoss()
 
     optimizer = optim.Adam(model.parameters(), lr=0.0001)
+    # optimizer = optim.Adam(model.parameters(), lr=0.001)
 
     train_loader = build_data_loader(train_dataset)
     test_loader = build_data_loader(test_dataset)
@@ -86,20 +87,20 @@ if __name__ == "__main__":
     loss_list = list()
     acc_list = list()
 
-    epoch = 10
+    epoch = 5 * 12
 
     # print(model.state_dict().keys())
-    v = model.state_dict()['identity_embedding.weight_v'].detach().cpu()
-    v_norm = torch.norm(v, dim=1, keepdim=True)
-    n = v / v_norm
+    # v = model.state_dict()['identity_embedding.weight_v'].detach().cpu()
+    # v_norm = torch.norm(v, dim=1, keepdim=True)
+    # n = v / v_norm
 
-    print(n.shape, v.shape)
+    # print(n.shape, v.shape)
     
-    cor_mat = torch.matmul(n, n.T) # (H, W) * (W, H)
-    print(torch.max(cor_mat), torch.min(cor_mat))
+    # cor_mat = torch.matmul(n, n.T) # (H, W) * (W, H)
+    # print(torch.max(cor_mat), torch.min(cor_mat))
 
-    matrix_image = cor_matrix_to_plt_image(cor_mat, step)
-    summary_writer.add_image('identity_correlation', matrix_image, step)
+    # matrix_image = cor_matrix_to_plt_image(cor_mat, step)
+    # summary_writer.add_image('identity_correlation', matrix_image, step)
 
     for i in range(epoch):
 
@@ -107,7 +108,7 @@ if __name__ == "__main__":
         for image, speaker in tqdm(train_loader):
             optimizer.zero_grad()
             # print(image)
-            pred = model(image.to(device))
+            pred = model(image.to(device), speaker.to(device))
             loss = loss_function(pred, speaker.to(device))
             loss.backward()
             optimizer.step()
@@ -139,7 +140,7 @@ if __name__ == "__main__":
         acc_list = list()
         with torch.no_grad():
             for image, speaker in tqdm(test_loader):
-                pred = model(image.to(device))
+                pred = model(image.to(device), speaker.to(device))
                 loss = loss_function(pred, speaker.to(device))
                 loss_list.append(loss.item())
                 acc = torch.mean((torch.argmax(pred.cpu(), dim=-1) == speaker).float())
